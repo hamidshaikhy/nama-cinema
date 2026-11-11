@@ -1,0 +1,580 @@
+/* The hall takes over the whole viewport: a 3D room with the seat plan laid on top. */
+
+.hall {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--house);
+  color: var(--beam);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hall__canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.hall[data-phase='seat'] .hall__canvas {
+  cursor: grab;
+}
+
+.hall[data-phase='seat'] .hall__canvas:active {
+  cursor: grabbing;
+}
+
+/* ---- the plan --------------------------------------------------------- */
+
+.hall__map {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top);
+  background: var(--house);
+  transition: opacity 0.3s ease;
+}
+
+/* Tapping a seat fades the plan out over the 3D room, which is already lined up under it. */
+.hall[data-phase='flying'] .hall__map,
+.hall[data-phase='seat'] .hall__map {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* On the way back the plan waits until the camera is nearly overhead again. */
+.hall[data-phase='leaving'] .hall__map {
+  pointer-events: none;
+  transition: opacity 0.35s ease 0.6s;
+}
+
+.hall__bar {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px 8px;
+}
+
+.hall__title {
+  min-width: 0;
+  text-align: center;
+}
+
+.hall__title h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.55rem;
+  line-height: 1.3;
+}
+
+.hall__title p {
+  color: var(--beam-dim);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* Showtimes scroll sideways when they do not fit, and sit centred when they do. */
+.showtimes {
+  display: flex;
+  gap: 8px;
+  padding: 6px 16px 10px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.showtimes::-webkit-scrollbar {
+  display: none;
+}
+
+.showtimes::before,
+.showtimes::after {
+  content: '';
+  margin: auto;
+}
+
+.showtimes__chip {
+  display: grid;
+  flex: none;
+  justify-items: center;
+  min-width: 84px;
+  padding: 7px 14px 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: none;
+  line-height: 1.45;
+  scroll-snap-align: center;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+
+.showtimes__chip b {
+  font-size: 1.08rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.showtimes__chip span {
+  color: var(--beam-faint);
+  font-size: 0.72rem;
+}
+
+.showtimes__chip:hover {
+  border-color: var(--beam-faint);
+}
+
+.showtimes__chip[aria-pressed='true'] {
+  border-color: var(--beam);
+  background: var(--beam);
+  color: var(--house);
+}
+
+.showtimes__chip[aria-pressed='true'] span {
+  color: rgba(15, 6, 8, 0.66);
+}
+
+/* The stage measures itself, so the plan can fill either its width or its height. */
+.hall__stage {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-height: 0;
+  padding: 74px 34px 10px;
+  container-type: size;
+}
+
+.seatmap {
+  position: relative;
+  width: min(100cqw, calc(100cqh * var(--ratio)), 780px);
+}
+
+.seatmap__screen {
+  position: absolute;
+  bottom: calc(100% + 18px);
+  left: 50%;
+  height: 40px;
+  border-top: 3px solid var(--beam);
+  border-radius: 50% 50% 0 0 / 26px 26px 0 0;
+  background: radial-gradient(60% 100% at 50% 0, color-mix(in srgb, var(--glow) 34%, transparent), transparent);
+  filter: drop-shadow(0 -2px 14px color-mix(in srgb, var(--glow) 70%, transparent));
+  transform: translateX(-50%);
+}
+
+.seatmap__screen span {
+  position: absolute;
+  inset: auto 0 2px;
+  color: var(--beam-faint);
+  font-size: 0.72rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.seatmap__row {
+  position: absolute;
+  right: -22px;
+  width: 16px;
+  color: var(--beam-faint);
+  font-size: 0.7rem;
+  line-height: 1;
+  text-align: center;
+  transform: translateY(-50%);
+}
+
+.seat {
+  position: absolute;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  background: none;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+}
+
+/* The button fills its whole cell so small seats stay easy to hit; the seat is drawn inside. */
+.seat::before {
+  content: '';
+  position: absolute;
+  inset: 13%;
+  border-radius: 30%;
+  background: var(--seat);
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s;
+}
+
+.seat--t4 {
+  --seat: var(--t4);
+}
+.seat--t3 {
+  --seat: var(--t3);
+}
+.seat--t2 {
+  --seat: var(--t2);
+}
+.seat--t1 {
+  --seat: var(--t1);
+}
+
+.seat:disabled {
+  cursor: default;
+}
+
+.seat--taken::before {
+  background: none;
+  box-shadow: inset 0 0 0 1.5px rgba(246, 233, 205, 0.2);
+}
+
+.seat--mine::before {
+  background: radial-gradient(var(--turq) 0 34%, transparent 38%);
+  box-shadow: inset 0 0 0 2px var(--turq);
+}
+
+.seat.seat--selected::before {
+  background: var(--turq);
+  box-shadow:
+    0 0 0 4px rgba(53, 201, 184, 0.28),
+    0 0 20px var(--turq);
+  transform: scale(1.2);
+}
+
+.seat:focus-visible {
+  outline-offset: -1px;
+  border-radius: 30%;
+}
+
+@media (hover: hover) {
+  .seat:not(:disabled):hover::before {
+    box-shadow: 0 0 0 2px var(--beam);
+    transform: scale(1.18);
+  }
+}
+
+.seatmap__tip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: var(--beam);
+  color: var(--house);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  white-space: nowrap;
+  text-align: center;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 16px));
+}
+
+.seatmap__tip b {
+  font-size: 0.88rem;
+}
+
+.hall__foot {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 8px 16px calc(14px + env(safe-area-inset-bottom));
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+  color: var(--beam-dim);
+  font-size: 0.78rem;
+}
+
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend .swatch {
+  width: 12px;
+  height: 12px;
+}
+
+.legend__unit {
+  margin-inline-end: 8px;
+}
+
+.hall__hint {
+  color: var(--beam-faint);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+/* ---- seated: controls over the 3D view -------------------------------- */
+
+.pov {
+  position: absolute;
+  inset: env(safe-area-inset-top) 0 auto;
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.hall[data-phase='seat'] .pov {
+  opacity: 1;
+}
+
+.hall[data-phase='seat'] .pov .icon-btn {
+  pointer-events: auto;
+}
+
+.pov__chip,
+.pov__hint {
+  justify-self: center;
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: rgba(15, 6, 8, 0.62);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.pov__chip {
+  border: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.pov__hint {
+  grid-column: 1 / -1;
+  color: var(--beam-dim);
+  font-size: 0.78rem;
+}
+
+/* ---- seated: the booking panel ---------------------------------------- */
+
+.sheet {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 20px 18px calc(18px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  border-radius: 24px 24px 0 0;
+  background: linear-gradient(rgba(24, 10, 14, 0.94), rgba(15, 6, 8, 0.98));
+  transform: translateY(105%);
+  transition: transform 0.5s cubic-bezier(0.2, 0.85, 0.25, 1);
+  will-change: transform;
+}
+
+/* It starts rising just before the camera lands, so both settle together. */
+.hall[data-phase='flying'] .sheet {
+  transform: none;
+  transition-delay: 1s;
+}
+
+.hall[data-phase='seat'] .sheet {
+  transform: none;
+}
+
+.hall[data-phase='leaving'] .sheet {
+  transition-duration: 0.3s;
+}
+
+.sheet__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sheet__kind {
+  color: var(--beam-dim);
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.sheet__kind--t4 {
+  color: var(--t4);
+}
+
+.sheet h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.9rem;
+  line-height: 1.35;
+}
+
+.sheet__note {
+  margin-top: 2px;
+  color: var(--beam-dim);
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+
+.minimap {
+  width: 84px;
+  flex: none;
+  overflow: visible;
+}
+
+.minimap__screen {
+  fill: none;
+  stroke: var(--beam);
+  stroke-width: 0.16;
+  stroke-linecap: round;
+}
+
+.minimap__seat {
+  fill: rgba(246, 233, 205, 0.24);
+}
+
+.minimap__you {
+  fill: var(--turq);
+  stroke: rgba(53, 201, 184, 0.3);
+  stroke-width: 0.4;
+}
+
+.sheet__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.sheet__stats div {
+  padding: 9px 12px 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.sheet__stats dd {
+  font-size: 1.08rem;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.sheet__stats dt {
+  color: var(--beam-faint);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.sheet__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.sheet__actions .btn {
+  padding: 0 18px;
+}
+
+.sheet__actions .btn--primary {
+  flex: 1;
+}
+
+.sheet__done {
+  display: grid;
+  justify-items: start;
+}
+
+.sheet__done p {
+  color: var(--beam-dim);
+  font-size: 0.92rem;
+}
+
+.sheet__done .sheet__actions {
+  justify-self: stretch;
+}
+
+.sheet__check {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 8px;
+  border-radius: 50%;
+  background: var(--turq);
+  color: #04211d;
+}
+
+/* ---- wide screens: the panel becomes a card beside the view ----------- */
+
+@media (min-width: 900px) {
+  .hall__bar {
+    padding: 18px 28px 10px;
+  }
+
+  .hall__title h1 {
+    font-size: 1.9rem;
+  }
+
+  .hall__stage {
+    padding-top: 92px;
+  }
+
+  .seatmap__screen {
+    height: 54px;
+    bottom: calc(100% + 24px);
+  }
+
+  .seatmap__row {
+    right: -30px;
+    font-size: 0.8rem;
+  }
+
+  .legend {
+    font-size: 0.85rem;
+  }
+
+  .pov {
+    padding: 18px 28px;
+  }
+
+  .sheet {
+    inset: 50% 28px auto auto;
+    width: 404px;
+    padding: 26px 24px 24px;
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    transform: translate(calc(100% + 40px), -50%);
+  }
+
+  .hall[data-phase='flying'] .sheet,
+  .hall[data-phase='seat'] .sheet {
+    transform: translate(0, -50%);
+  }
+}
+
+/* Short landscape phones: tighten the chrome so the plan keeps its room. */
+@media (max-height: 520px) {
+  .hall__bar {
+    padding-block: 6px 2px;
+  }
+
+  .hall__title p,
+  .hall__hint,
+  .showtimes__chip span {
+    display: none;
+  }
+
+  .hall__stage {
+    padding-top: 50px;
+  }
+
+  .seatmap__screen {
+    height: 26px;
+    bottom: calc(100% + 8px);
+  }
+
+  .sheet__note {
+    display: none;
+  }
+}

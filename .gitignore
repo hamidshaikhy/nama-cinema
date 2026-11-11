@@ -1,0 +1,6 @@
+node_modules
+dist
+*.tsbuildinfo
+.vercel
+*.mp4
+.playwright-mcp
